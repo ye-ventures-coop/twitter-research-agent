@@ -1,0 +1,91 @@
+name: Twitter Research
+
+on:
+  schedule:
+    # Каждые 4 часа по UTC, на 17-й минуте (снижаем риск задержек на топ-часах).
+    # GitHub может запускать с опозданием под нагрузкой — это нормально.
+    - cron: "17 */4 * * *"
+  workflow_dispatch: # ручной запуск из вкладки Actions
+  push:
+    branches: [main]
+    paths: ["agent/**", "state/settings.json"] # при изменении кода/настроек — тестовый прогон
+
+permissions:
+  contents: write # нужно для коммита state/ обратно в репозиторий
+
+concurrency:
+  group: research
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write grok2api config
+        env:
+          G2A_JWT_SECRET: ${{ secrets.G2A_JWT_SECRET }}
+          G2A_CRED_KEY: ${{ secrets.G2A_CRED_KEY }}
+          G2A_ADMIN_PASSWORD: ${{ secrets.G2A_ADMIN_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib
+          cfg = f"""
+          server:
+            listen: "0.0.0.0:8000"
+            swaggerEnabled: false
+          secrets:
+            jwtSecret: "{os.environ['G2A_JWT_SECRET']}"
+            credentialEncryptionKey: "{os.environ['G2A_CRED_KEY']}"
+          bootstrapAdmin:
+            username: "admin"
+            password: "{os.environ['G2A_ADMIN_PASSWORD']}"
+          database:
+            driver: sqlite
+            sqlite:
+              path: "/tmp/grok2api/backend.db"
+          runtimeStore:
+            driver: memory
+          media:
+            driver: local
+            local:
+              path: "/tmp/grok2api/media"
+          """
+          pathlib.Path("grok2api-ci.yaml").write_text(cfg, encoding="utf-8")
+          PY
+
+      - name: Start grok2api
+        run: |
+          docker run -d --name grok2api \
+            -p 127.0.0.1:8000:8000 \
+            -v "$PWD/grok2api-ci.yaml:/run/grok2api/config.yaml:ro" \
+            ghcr.io/chenyme/grok2api:latest
+
+      - name: Run research
+        env:
+          GROK2API_BASE_URL: http://127.0.0.1:8000
+          G2A_ADMIN_PASSWORD: ${{ secrets.G2A_ADMIN_PASSWORD }}
+          GROK_SSO: ${{ secrets.GROK_SSO }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATE_DIR: state
+          PYTHONPATH: agent
+        run: |
+          pip install -r agent/requirements-ci.txt
+          python -m app.ci
+
+      - name: Dump grok2api logs on failure
+        if: failure()
+        run: docker logs grok2api | tail -n 200
+
+      - name: Commit agent state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: agent state [skip ci]"
+          git pull --rebase
+          git push

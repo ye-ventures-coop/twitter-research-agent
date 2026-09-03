@@ -1,0 +1,38 @@
+name: twitter-research
+
+services:
+  grok2api:
+    image: ghcr.io/chenyme/grok2api:latest
+    container_name: grok2api
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: "Europe/Moscow"
+    ports:
+      # Админка и API доступны только локально на сервере.
+      # Для настройки используйте SSH-туннель: ssh -L 8000:127.0.0.1:8000 user@server
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - "./grok2api-config.yaml:/run/grok2api/config.yaml:ro"
+      - "grok2api-data:/app/data"
+
+  agent:
+    build: ./agent
+    container_name: research-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      GROK2API_BASE_URL: "http://grok2api:8000"
+      DATA_DIR: "/data"
+      TZ: "Europe/Moscow"
+    volumes:
+      - "agent-data:/data"
+    depends_on:
+      - grok2api
+
+volumes:
+  grok2api-data:
+  agent-data:

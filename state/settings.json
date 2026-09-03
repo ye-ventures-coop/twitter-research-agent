@@ -1,0 +1,14 @@
+{
+  "topics": [
+    {
+      "name": "AI и нейросети",
+      "query": "LLM, AI-агенты, новые модели, Grok, GPT, Claude, Gemini, open-source AI"
+    }
+  ],
+  "min_likes": 50,
+  "min_views": 10000,
+  "min_reposts": 5,
+  "max_posts_per_topic": 5,
+  "interval_hours": 4,
+  "model": "grok-chat-fast"
+}

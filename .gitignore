@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+data/
+# state/seen.db намеренно коммитится (память агента между прогонами)
+*.db
+!state/seen.db

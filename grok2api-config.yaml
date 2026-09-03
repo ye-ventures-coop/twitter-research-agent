@@ -1,0 +1,34 @@
+# Конфиг grok2api. Перед запуском ОБЯЗАТЕЛЬНО замените три значения CHANGE_ME.
+# Генерация секретов (на сервере):
+#   openssl rand -hex 32    -> jwtSecret
+#   openssl rand -base64 32 -> credentialEncryptionKey
+# credentialEncryptionKey после добавления аккаунтов МЕНЯТЬ НЕЛЬЗЯ —
+# иначе сохранённые токены перестанут расшифровываться.
+
+server:
+  listen: "0.0.0.0:8000"
+  swaggerEnabled: false
+
+auth:
+  secureCookies: false
+
+secrets:
+  jwtSecret: "CHANGE_ME_32_HEX"
+  credentialEncryptionKey: "CHANGE_ME_BASE64"
+
+bootstrapAdmin:
+  username: "admin"
+  password: "CHANGE_ME_STRONG_PASSWORD"
+
+database:
+  driver: sqlite
+  sqlite:
+    path: "/app/data/backend.db"
+
+runtimeStore:
+  driver: memory
+
+media:
+  driver: local
+  local:
+    path: "/app/data/media"
